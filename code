@@ -1,1 +1,94 @@
+import tensorflow as tf
+from tensorflow.keras import models,layers
+import matplotlib.pyplot as plt
+#%%
+IMAGE_SIZE=256
+BATCH_SIZE=64
+CHANNELS=3
+EPOCHS=13
+#%%
+dataset=tf.keras.preprocessing.image_dataset_from_directory(
+    "BRAINcls3/Training",
+    shuffle=True,image_size=(IMAGE_SIZE,IMAGE_SIZE),
+    batch_size=BATCH_SIZE
+)
+#%%
+class_names=dataset.class_names
+class_names
+#%%
+len(dataset)
+#%%
+plt.figure(figsize=(10,10))
+for image_batch,label_batch in dataset.take(1):
+    for i in range(12):
+       ax=plt.subplot(3,4,i+1)
+       plt.imshow(image_batch[i].numpy().astype('uint8'))
+       plt.title(class_names[label_batch[i]])
+       plt.axis('off')
+#%%
+resize_and_rescale=tf.keras.Sequential([
+    layers.experimental.preprocessing.Rescaling(IMAGE_SIZE,IMAGE_SIZE),
+    layers.experimental.preprocessing.Rescaling(1.0/255)
+])
+#%%
+data_augmentation=tf.keras.Sequential([
+    layers.experimental.preprocessing.RandomFlip("horizontal_and_vertical"),
+    layers.experimental.preprocessing.RandomRotation(0.2)
+])
+#%%
+from tensorflow.keras.preprocessing.image import ImageDataGenerator
+train_datagen = ImageDataGenerator(
+                fill_mode = 'nearest',
+                validation_split=0.2
+)
+#%%
+folder_path="BRAINcls3/Training"
+train_generator=train_datagen.flow_from_directory(
+    folder_path,
+    target_size=(108,108),
+    color_mode='rgb',
+    class_mode='categorical',
+    subset='training',
+)
+validation_generator=train_datagen.flow_from_directory(
+    folder_path,
+    target_size=(108,108),
+    color_mode='rgb',
+    class_mode='categorical',
+    subset='validation',
+)
+#%%
+from tensorflow.keras.applications import ResNet50
+from tensorflow.keras.layers import Flatten, Dense, Dropout, Conv2D, MaxPooling2D
+
+#%%
+model = tf.keras.models.Sequential([
+    ResNet50(input_shape=(108,108,3), include_top=False),
+])
+for layer in model.layers:
+  layer.trainable = False
+
+model.add(Conv2D(64, (3,3), activation='relu'))
+model.add(MaxPooling2D(2,2))
+model.add(Flatten())
+model.add(Dense(64, activation='relu'))
+model.add(Dropout(0.4))
+model.add(Dense(6, activation='softmax'))
+
+model.summary()
+#%%
+model.compile(optimizer='Adam',
+              loss='categorical_crossentropy',
+              metrics=['accuracy'])
+#%%
+history = model.fit(train_generator,
+                    validation_data=validation_generator,
+                    epochs=13,
+                    verbose=1,
+                    )
+#%%
+model.save('Brain_Tumor.h5')
+#%%
+from tensorflow import keras
+model = keras.models.load_model('Brain_Tumor.h5')
 
